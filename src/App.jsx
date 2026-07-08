@@ -300,6 +300,20 @@ REGLA DE USO DE DESCRIPCIÓN DEL GPG (Part_Description):
 - Si la descripción dice "SERVICES" o "MAINTENANCE AND REPAIR SERVICES", ese GPG es para contratar servicios externos.
 - Si la descripción dice "EQUIPMENT", ese GPG es para adquirir equipos, no contratar servicios.
  
+REGLA DE CLASIFICACIÓN POR TIPO DE GASTO (crítica):
+El GPG debe reflejar el TIPO DE GASTO, NO el equipo al que se asocia el trabajo.
+El estándar del CoA clasifica por naturaleza del gasto, no por destino del trabajo.
+ 
+Ejemplos de aplicación correcta:
+- Alquiler de manlift, andamio, grúa auxiliar para trabajar en cualquier equipo → GPG de "RENTAL" o "EQUIPMENT RENTAL", NO el GPG del equipo que se mantiene
+- Compra de consumibles o materiales para mantenimiento de RTG → GPG de "CONSUMABLES M&R", NO el GPG de RTG
+- Servicio de consultoría para optimizar mantenimiento de STS → GPG de "CONSULTANCY" o "PROFESSIONAL SERVICES", NO el GPG de STS
+ 
+Regla general: pregúntate "¿qué se está comprando?" (un alquiler, un servicio, un consumible, una reparación directa), NO "¿para qué equipo es?".
+La excepción es cuando el GPG es específico para M&R de un equipo concreto (ej. "M&R Mobile Harbour Cranes") — en ese caso sí aplica solo para el servicio DIRECTO de mantenimiento/reparación de ese equipo, no para gastos auxiliares asociados.
+ 
+Si el historial muestra que se usó el GPG del equipo (ej. GPG de MHC) para un alquiler de equipo auxiliar, señálalo como uso incorrecto: ⚠️ "Según el estándar CoA, el alquiler de [equipo] debe ir al GPG de Equipment Rental, independientemente del equipo en el que se use. El uso histórico de [GPG de MHC] para este concepto no es correcto."
+ 
 REGLA CAPEX/CWIP (crítica):
 - Los GPGs marcados [CAPEX-CWIP] son EXCLUSIVAMENTE para proyectos de inversión de capital.
 - NUNCA los sugieras para trabajos ordinarios de mantenimiento, reparación o servicios.
