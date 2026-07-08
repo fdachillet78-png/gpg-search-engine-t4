@@ -6,10 +6,7 @@ import * as XLSX from "xlsx";
 // t4.vercel.app      → T4
 // localhost/callao   → Callao (desarrollo)
 function detectTerminal() {
-  const host = window.location.hostname;
-  const path = window.location.pathname;
-  if (host.includes("t4") || path.startsWith("/t4")) return "t4";
-  return "callao";
+  return "t4"; // Terminal fija: T4
 }
  
 const TERMINAL   = detectTerminal();
@@ -700,7 +697,7 @@ export default function App() {
         </div>
         <p style={{ maxWidth:800, margin:"6px auto 0", fontSize:11, color:"#94a3b8", display:"flex", justifyContent:"space-between", gap:12, flexWrap:"wrap" }}>
           <span>{!dataLoaded?t.hintNoData(TERM_LABEL):t.hintData(TERM_LABEL)}</span>
-          <span style={{ color:"#cbd5e1" }}>Elaborado por Franco D' Achille — APMT Callao</span>
+          <span style={{ color:"#cbd5e1" }}>Elaborado por Franco D' Achille — APMT T4</span>
         </p>
       </div>
  
