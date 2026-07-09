@@ -18,7 +18,7 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    const model = "gemini-2.5-flash";
+    const model = "gemini-2.5-pro";
     // streamGenerateContent con alt=sse para streaming real
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${process.env.GEMINI_API_KEY}`;
 
