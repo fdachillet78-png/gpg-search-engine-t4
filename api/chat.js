@@ -30,6 +30,11 @@ module.exports = async function handler(req, res) {
     const model = "gemini-2.5-pro";
     const url   = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${process.env.GEMINI_API_KEY}`;
 
+    // Debug: verificar si G-301641 llega al modelo
+    const systemText = contents[0]?.parts[0]?.text || "";
+    console.log("G-301641 en prompt:", systemText.includes("G-301641"));
+    console.log("Total chars en prompt:", systemText.length);
+
     const response = await fetch(url, {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
