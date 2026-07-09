@@ -1,4 +1,4 @@
-// api/chat.js — Proxy Claude Haiku (más económico, mismo streaming que antes)
+// api/chat.js — Proxy Claude Haiku
 module.exports = async function handler(req, res) {
   if (req.method !== "POST")
     return res.status(405).json({ error: "Method not allowed" });
