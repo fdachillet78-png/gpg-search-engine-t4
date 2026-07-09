@@ -121,6 +121,53 @@ function stem(word) {
 const STOP = new Set(["de","del","la","el","los","las","un","una","en","para","y","a","con","por","que","se","al","es","su","sus","lo","le","les","nos","mas","sin","entre","sobre","hasta","desde","como","si","no","o","e","u"]);
 function tokenize(str) { return normalize(str).split(" ").filter(w => w.length>2 && !STOP.has(w)); }
 
+// ═══ BÚSQUEDA DE GPGs RELEVANTES ════════════════════════════════════════════
+// Encuentra los GPGs más relevantes para la consulta del usuario
+// para reducir el tamaño del prompt enviado al modelo
+const ALWAYS_INCLUDE_GPGS = new Set([
+  // GPGs de alquiler — siempre incluir para casos de manlift, grúas auxiliares, etc.
+  "G-301641","G-301632","G-301061",
+  // GPGs OT
+  "G-301148","G-301293","G-301294","G-301295","G-301296","G-301297","G-301298",
+]);
+
+function findRelevantGpgs(gpgMap, terms, maxResults=40) {
+  if (!gpgMap?.size) return [];
+  const qn = (terms||[]).map(t => ({ raw: normalize(t), stem: stem(normalize(t)) }));
+  
+  const scored = [];
+  for (const [pn, g] of gpgMap.entries()) {
+    // Always include critical GPGs
+    if (ALWAYS_INCLUDE_GPGS.has(pn)) {
+      scored.push({ pn, g, score: 1000 });
+      continue;
+    }
+    const raw = normalize(g.desc || "");
+    const words = tokenize(raw);
+    const stems = words.map(w => stem(w));
+    let score = 0;
+    for (const qt of qn) {
+      if (raw.includes(qt.raw)) { score += qt.raw.length > 5 ? 5 : 3; continue; }
+      if (stems.includes(qt.stem) && qt.stem.length > 3) { score += 3; continue; }
+      for (const dw of words) {
+        const ml = Math.min(dw.length, qt.raw.length);
+        if (ml >= 4) { let k=0; while(k<ml&&dw[k]===qt.raw[k])k++; if(k>=4){score+=2;break;} }
+      }
+    }
+    if (score > 0) scored.push({ pn, g, score });
+  }
+  scored.sort((a, b) => b.score - a.score);
+  // Always include top results + always-include GPGs
+  const result = scored.slice(0, maxResults);
+  // Also add any ALWAYS_INCLUDE that didn't score (may not be in scored list)
+  for (const mustPn of ALWAYS_INCLUDE_GPGS) {
+    if (!result.find(r => r.pn === mustPn) && gpgMap.has(mustPn)) {
+      result.push({ pn: mustPn, g: gpgMap.get(mustPn), score: 999 });
+    }
+  }
+  return result;
+}
+
 // Palabras genéricas de negocio que no aportan especificidad a la búsqueda
 const BUSINESS_STOP = new Set([
   "servicio","servicios","gpg","uso","usar","usar","necesito","necesita","necesitamos",
@@ -209,8 +256,10 @@ function buildMaps(gpgList, coaData) {
   return { coaMap, gpgMap };
 }
 
-function buildSystem(gpgList, coaData, lang="es") {
+function buildSystem(gpgList, coaData, lang="es", relevantGpgs=null) {
   const { gpgMap } = buildMaps(gpgList, coaData);
+  // Use relevant GPGs if provided, otherwise use full map
+  const gpgsToShow = relevantGpgs || [...gpgMap.entries()].map(([pn,g]) => ({pn,g}));
   let p = `Eres un asistente de GPG codes para APM Terminals (grupo Maersk), terminal ${TERM_LABEL}.
 Ayudas a identificar el GPG correcto para órdenes de compra en IFS10, asegurando que el gasto vaya a la cuenta contable correcta.
 
@@ -342,12 +391,9 @@ HISTORIAL (si se adjunta):
 ${T[lang].langLine}\n`;
 
   if (gpgList?.length) {
-    p += `\n=== CATÁLOGO DE GPGs ===\n`;
-    let n=0;
-    for (const [pn,g] of gpgMap.entries()) {
-      if (n++>500) break;
+    p += `\n=== GPGs RELEVANTES PARA ESTA CONSULTA ===\n`;
+    for (const {pn, g} of gpgsToShow) {
       const gpgTag = g.isCapex?"[CAPEX]":g.isIT?"[IT]":"";
-      // Compact format to reduce prompt size
       p += `${pn}${gpgTag?" "+gpgTag:""} | ${g.desc} | ${g.accGroup} | ${g.accountDef||"N/D"}\n`;
     }
   }
@@ -539,7 +585,9 @@ export default function App() {
 
     const ctrl = new AbortController(); abortRef.current = ctrl;
     try {
-      const system  = buildSystem(currGpg, currCoa, lang) + buildPoContext(similar, gpgMap);
+      // Find relevant GPGs for this specific query (reduces prompt from 40K to ~5K chars)
+      const relevantGpgs = findRelevantGpgs(gpgMap, terms, 40);
+      const system  = buildSystem(currGpg, currCoa, lang, relevantGpgs) + buildPoContext(similar, gpgMap);
       const apiMsgs = newMsgs.map(m=>({ role:m.role, content:m.content }));
 
       const res = await fetch("/api/chat", {
