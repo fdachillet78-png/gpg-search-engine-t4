@@ -1,30 +1,35 @@
-// api/chat.js — Proxy hacia Groq API (gratuito, sin restricción geográfica)
+// api/chat.js — Proxy hacia Google Gemini API (con billing, streaming)
 module.exports = async function handler(req, res) {
   if (req.method !== "POST")
     return res.status(405).json({ error: "Method not allowed" });
  
   const { system, messages } = req.body;
  
-  // Groq usa formato compatible con OpenAI
-  const groqMessages = [];
-  if (system) groqMessages.push({ role: "system", content: system });
+  const contents = [];
+  if (system) {
+    contents.push({ role: "user",  parts: [{ text: `[INSTRUCCIONES]\n${system}` }] });
+    contents.push({ role: "model", parts: [{ text: "Entendido." }] });
+  }
   for (const m of (messages || [])) {
-    groqMessages.push({ role: m.role, content: m.content });
+    contents.push({
+      role:  m.role === "assistant" ? "model" : "user",
+      parts: [{ text: m.content }],
+    });
   }
  
   try {
-    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    const model = "gemini-2.0-flash";
+    const url   = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`;
+ 
+    const response = await fetch(url, {
       method:  "POST",
-      headers: {
-        "Content-Type":  "application/json",
-        "Authorization": `Bearer ${process.env.GROQ_API_KEY}`,
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        model:       "llama-3.3-70b-versatile", // el más capaz en tier gratuito
-        messages:    groqMessages,
-        max_tokens:  1000,
-        temperature: 0.2,
-        stream:      false,
+        contents,
+        generationConfig: {
+          maxOutputTokens: 1000,
+          temperature:     0.2,
+        },
       }),
     });
  
@@ -34,9 +39,8 @@ module.exports = async function handler(req, res) {
     }
  
     const data = await response.json();
-    const text = data?.choices?.[0]?.message?.content || "";
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
  
-    // Formato SSE compatible con el frontend
     res.setHeader("Content-Type", "text/event-stream");
     res.write(`data: ${JSON.stringify({ type:"content_block_delta", delta:{ type:"text_delta", text } })}\n\n`);
     res.write("data: [DONE]\n\n");
@@ -46,4 +50,3 @@ module.exports = async function handler(req, res) {
     res.status(500).json({ error: err.message });
   }
 };
- 
