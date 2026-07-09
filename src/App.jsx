@@ -333,7 +333,15 @@ ${T[lang].langLine}\n`;
       const gpgTag = g.isCapex?"[CAPEX-CWIP]":g.isIT?"[IT]":""; p += `GPG: ${pn}${gpgTag?" "+gpgTag:""} | Desc: ${g.desc} | Cuenta: ${g.accGroup} | Os_Acc: ${g.osAcc||"N/D"} | Estándar Global: ${g.accountDef||"N/D"}\n`;
     }
   }
-  // CoA no se incluye por separado — Account_Definition ya está en cada línea del catálogo GPG
+  if (coaData?.length) {
+    p += `\n=== CHART OF ACCOUNTS (OneStream) ===\n`;
+    const { gpgMap: gm } = buildMaps(gpgList, coaData);
+    const usedOsAcc = new Set([...gm.values()].map(g=>g.osAcc).filter(Boolean));
+    const filtered = coaData.filter(c=>usedOsAcc.has(c.Os_Acc||c.os_acc||""));
+    const list = filtered.length>0 ? filtered.slice(0,100) : coaData.slice(0,100);
+    for (const c of list)
+      p += `Os_Acc: ${c.Os_Acc||c.os_acc||""} | ${c.Os_Acc_Desc||c.os_acc_desc||""} | Def: ${c.Account_Definition||c.account_definition||""}\n`;
+  }
   if (!gpgList?.length && !coaData?.length)
     p += `\nNOTA: No hay datos cargados. Indica al usuario que cargue los archivos Excel.`;
   return p;
