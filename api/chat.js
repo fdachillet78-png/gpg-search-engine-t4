@@ -20,7 +20,7 @@ module.exports = async function handler(req, res) {
   }
  
   try {
-    const model = "gemini-2.0-flash";
+    const model = "gemini-1.5-flash";
     const url   = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${process.env.GEMINI_API_KEY}`;
  
     const response = await fetch(url, {
@@ -77,4 +77,3 @@ module.exports = async function handler(req, res) {
     res.status(500).json({ error: err.message });
   }
 };
- 
