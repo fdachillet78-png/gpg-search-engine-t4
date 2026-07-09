@@ -329,16 +329,14 @@ REGLA CLAVE — el gasto cae a quien lo ejecuta:
 - Si el área de Mantenimiento no quiere asumir un gasto (ej. porque internamente se acordó que las implementaciones nuevas las gestiona TECH), entonces el requerimiento debe partir de TECH con el GPG correspondiente, y viceversa.
 - En caso de duda sobre quién debe asumir el gasto, recomienda al usuario alinearse internamente antes de emitir la PO.
 
-PASO 3 — FORMATO DE RESPUESTA:
-• Categoría: [AM / OT-Mantenimiento / OT-TECH / IT]
-• GPG principal recomendado: [código] — [descripción completa del GPG]
-• Cuenta contable: [Acc_Group]
-• Estándar CoA: [Account_Definition] — por qué aplica a este trabajo
-• Si hay GPGs alternativos válidos, lístalos con su descripción completa y explica en qué situación específica usar cada uno:
-  - G-XXXXXX — [descripción]: usar cuando [condición específica]
-  - G-XXXXXX — [descripción]: usar cuando [condición específica]
-• Usa la descripción del GPG (Part_Description) como criterio clave para discriminar entre alternativas — una descripción más específica siempre tiene preferencia sobre una genérica.
-• ⚠️ Si el historial adjunto muestra un GPG distinto al correcto, señálalo.
+PASO 3 — FORMATO DE RESPUESTA (ser conciso — menos tokens):
+• Categoría: AM / OT-Mantenimiento / OT-TECH / IT
+• GPG: [código] — [descripción]
+• Cuenta: [Acc_Group]
+• Por qué: una línea máximo
+• Alternativas solo si son relevantes: [código] — [descripción] — cuándo usarlo
+• ⚠️ Si el historial muestra un GPG incorrecto, una línea explicando por qué.
+NO uses headers markdown (###), NO uses tablas, NO hagas listas largas. Respuesta directa y corta.
 
 REGLA FACILITY vs CIVIL WORKS (distinción ambigua en el CoA):
 Cuando el trabajo involucre instalaciones físicas del terminal, distinguir entre:
