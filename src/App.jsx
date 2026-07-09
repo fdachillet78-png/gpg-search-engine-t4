@@ -329,19 +329,11 @@ ${T[lang].langLine}\n`;
     p += `\n=== CATÁLOGO DE GPGs ===\n`;
     let n=0;
     for (const [pn,g] of gpgMap.entries()) {
-      if (n++>500) break;
+      if (n++>300) break;
       const gpgTag = g.isCapex?"[CAPEX-CWIP]":g.isIT?"[IT]":""; p += `GPG: ${pn}${gpgTag?" "+gpgTag:""} | Desc: ${g.desc} | Cuenta: ${g.accGroup} | Os_Acc: ${g.osAcc||"N/D"} | Estándar Global: ${g.accountDef||"N/D"}\n`;
     }
   }
-  if (coaData?.length) {
-    p += `\n=== CHART OF ACCOUNTS (OneStream) ===\n`;
-    const { gpgMap: gm } = buildMaps(gpgList, coaData);
-    const usedOsAcc = new Set([...gm.values()].map(g=>g.osAcc).filter(Boolean));
-    const filtered = coaData.filter(c=>usedOsAcc.has(c.Os_Acc||c.os_acc||""));
-    const list = filtered.length>0 ? filtered.slice(0,150) : coaData.slice(0,150);
-    for (const c of list)
-      p += `Os_Acc: ${c.Os_Acc||c.os_acc||""} | ${c.Os_Acc_Desc||c.os_acc_desc||""} | Def: ${c.Account_Definition||c.account_definition||""}\n`;
-  }
+  // CoA no se incluye por separado — Account_Definition ya está en cada línea del catálogo GPG
   if (!gpgList?.length && !coaData?.length)
     p += `\nNOTA: No hay datos cargados. Indica al usuario que cargue los archivos Excel.`;
   return p;
@@ -512,7 +504,7 @@ export default function App() {
       const pn = l.Part_No||l.part_no||"";
       return !gpgMap.get(pn)?.isCapex;
     });
-    const similar = findSimilar(poSinCapex, terms, 5);
+    const similar = findSimilar(poSinCapex, terms, 3);
 
     const newMsgs = [...messages, { role:"user", content:msg, poRows:null }];
     setMessages(newMsgs);
