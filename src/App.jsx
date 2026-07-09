@@ -375,9 +375,13 @@ Ejemplos de aplicación correcta:
 - Servicio de consultoría para optimizar mantenimiento de STS → GPG de "CONSULTANCY" o "PROFESSIONAL SERVICES", NO el GPG de STS
 
 Regla general: pregúntate "¿qué se está comprando?" (un alquiler, un servicio, un consumible, una reparación directa), NO "¿para qué equipo es?".
-La excepción es cuando el GPG es específico para M&R de un equipo concreto (ej. "M&R Mobile Harbour Cranes") — en ese caso sí aplica solo para el servicio DIRECTO de mantenimiento/reparación de ese equipo, no para gastos auxiliares asociados.
+La excepción es cuando el GPG es específico para M&R de un equipo concreto (ej. "M&R Mobile Harbour Cranes") — en ese caso sí aplica para todos los gastos DIRECTOS de mantenimiento y reparación de ese equipo:
+  ✓ Servicios de mantenimiento y reparación contratados a terceros
+  ✓ Repuestos y materiales para el equipo
+  ✓ Mano de obra externa para reparaciones del equipo
+  ✗ NO aplica para gastos AUXILIARES asociados al trabajo (alquileres de equipos de soporte como manlifts, andamios, grúas auxiliares — esos van a GPGs de Equipment Rental)
 
-Si el historial muestra que se usó el GPG del equipo (ej. GPG de MHC) para un alquiler de equipo auxiliar, señálalo como uso incorrecto: ⚠️ "Según el estándar CoA, el alquiler de [equipo] debe ir al GPG de Equipment Rental, independientemente del equipo en el que se use. El uso histórico de [GPG de MHC] para este concepto no es correcto."
+Si el historial muestra que se usó el GPG del equipo (ej. GPG de MHC) para un alquiler de equipo auxiliar, señálalo como uso incorrecto: ⚠️ "El alquiler de [equipo auxiliar] debe ir al GPG de Equipment Rental. El GPG de MHC es para gastos directos de M&R del equipo, no para equipos de soporte al trabajo."
 
 REGLA CAPEX/CWIP (crítica):
 - Los GPGs marcados [CAPEX-CWIP] son EXCLUSIVAMENTE para proyectos de inversión de capital.
