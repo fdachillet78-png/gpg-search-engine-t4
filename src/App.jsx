@@ -327,10 +327,9 @@ ${T[lang].langLine}\n`;
 
   if (gpgList?.length) {
     p += `\n=== CATÁLOGO DE GPGs ===\n`;
-    // Limitar a 200 GPGs para mantener el prompt dentro de límites de tokens
     let n=0;
     for (const [pn,g] of gpgMap.entries()) {
-      if (n++>200) break;
+      if (n++>500) break;
       const gpgTag = g.isCapex?"[CAPEX-CWIP]":g.isIT?"[IT]":""; p += `GPG: ${pn}${gpgTag?" "+gpgTag:""} | Desc: ${g.desc} | Cuenta: ${g.accGroup} | Os_Acc: ${g.osAcc||"N/D"} | Estándar Global: ${g.accountDef||"N/D"}\n`;
     }
   }
@@ -339,7 +338,7 @@ ${T[lang].langLine}\n`;
     const { gpgMap: gm } = buildMaps(gpgList, coaData);
     const usedOsAcc = new Set([...gm.values()].map(g=>g.osAcc).filter(Boolean));
     const filtered = coaData.filter(c=>usedOsAcc.has(c.Os_Acc||c.os_acc||""));
-    const list = filtered.length>0 ? filtered.slice(0,50) : coaData.slice(0,50);
+    const list = filtered.length>0 ? filtered.slice(0,150) : coaData.slice(0,150);
     for (const c of list)
       p += `Os_Acc: ${c.Os_Acc||c.os_acc||""} | ${c.Os_Acc_Desc||c.os_acc_desc||""} | Def: ${c.Account_Definition||c.account_definition||""}\n`;
   }
@@ -513,7 +512,7 @@ export default function App() {
       const pn = l.Part_No||l.part_no||"";
       return !gpgMap.get(pn)?.isCapex;
     });
-    const similar = findSimilar(poSinCapex, terms, 3);
+    const similar = findSimilar(poSinCapex, terms, 5);
 
     const newMsgs = [...messages, { role:"user", content:msg, poRows:null }];
     setMessages(newMsgs);
