@@ -1,4 +1,4 @@
-// api/chat.js — Proxy hacia Google Gemini API (con billing, streaming)
+// api/chat.js — Proxy hacia Google Gemini API con streaming
 module.exports = async function handler(req, res) {
   if (req.method !== "POST")
     return res.status(405).json({ error: "Method not allowed" });
@@ -19,7 +19,8 @@ module.exports = async function handler(req, res) {
 
   try {
     const model = "gemini-2.5-flash";
-    const url   = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`;
+    // streamGenerateContent con alt=sse para streaming real
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${process.env.GEMINI_API_KEY}`;
 
     const response = await fetch(url, {
       method:  "POST",
@@ -38,11 +39,40 @@ module.exports = async function handler(req, res) {
       return res.status(response.status).json(err);
     }
 
-    const data = await response.json();
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-
+    // Stream la respuesta directamente al cliente
     res.setHeader("Content-Type", "text/event-stream");
-    res.write(`data: ${JSON.stringify({ type:"content_block_delta", delta:{ type:"text_delta", text } })}\n\n`);
+    res.setHeader("Cache-Control", "no-cache");
+
+    const reader  = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
+
+      for (const line of lines) {
+        if (!line.startsWith("data: ")) continue;
+        const raw = line.slice(6).trim();
+        if (!raw || raw === "[DONE]") continue;
+        try {
+          const parsed = JSON.parse(raw);
+          const text   = parsed?.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (text) {
+            // Convertir formato Gemini → formato Anthropic que espera el frontend
+            res.write(`data: ${JSON.stringify({
+              type:  "content_block_delta",
+              delta: { type: "text_delta", text }
+            })}\n\n`);
+          }
+        } catch {}
+      }
+    }
+
     res.write("data: [DONE]\n\n");
     res.end();
 
