@@ -6,8 +6,11 @@ module.exports = async function handler(req, res) {
   const { system, messages } = req.body;
 
   const CRITICAL = `REGLAS CRÍTICAS — SEGUIR SIEMPRE SIN EXCEPCIÓN:
-1. Si el usuario menciona alquiler/renta/arrendamiento de equipo y NO especifica la duración: responde ÚNICAMENTE con la pregunta "¿El alquiler será por menos de 1 mes o más de 1 mes?" y NO recomiendes ningún GPG hasta recibir la respuesta.
-2. Usa SOLO GPGs del catálogo proporcionado. No inventes GPGs ni menciones GPGs que no estén en el catálogo.
+1. ALQUILER DE EQUIPO: Si el usuario menciona alquiler/renta/arrendamiento de equipo y NO especifica la duración, responde ÚNICAMENTE con la pregunta "¿El alquiler será por menos de 1 mes o más de 1 mes?" y NO recomiendes ningún GPG hasta recibir la respuesta.
+   - Menos de 1 mes → busca en el catálogo un GPG con "RENTAL" y "LESS THAN 1 MONTH" o "SHORT TERM" en su descripción (ej. G-301641 si existe)
+   - Más de 1 mes → busca en el catálogo un GPG con "LEASE" y "MORE THAN 1 MONTH" en su descripción (ej. G-301632 si existe)
+   - Si existe un GPG específico para la duración indicada, DEBES usarlo. No digas "no existe" si el catálogo lo tiene.
+2. Usa SOLO GPGs del catálogo proporcionado. Busca cuidadosamente en TODO el catálogo antes de decir que un GPG no existe.
 3. Si hay ambigüedad, haz UNA sola pregunta y espera respuesta antes de recomendar.
 `;
 
