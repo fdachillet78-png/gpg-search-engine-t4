@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import * as XLSX from "xlsx";
- 
+
 // ═══ DETECCIÓN DE TERMINAL POR URL ════════════════════════════════════════════
 // callao.vercel.app  → Callao
 // t4.vercel.app      → T4
@@ -8,7 +8,7 @@ import * as XLSX from "xlsx";
 function detectTerminal() {
   return "t4"; // Terminal fija: T4
 }
- 
+
 const TERMINAL   = detectTerminal();
 const TERM_LABEL = TERMINAL === "t4" ? "T4" : "Callao";
 // ═══ TRADUCCIONES ═════════════════════════════════════════════════════════════
@@ -76,7 +76,7 @@ const T = {
     langLine: "LANGUAGE: always respond in English. When referring to categories, use: AM (Asset Management), OT-Maintenance (OT work by Maintenance team), OT-TECH (OT work by Technology/OT&A team), IT (Information Technology).",
   },
 };
- 
+
 // ═══ EXCEL ════════════════════════════════════════════════════════════════════
 function parseExcel(file) {
   return new Promise((resolve, reject) => {
@@ -91,7 +91,7 @@ function parseExcel(file) {
     reader.readAsArrayBuffer(file);
   });
 }
- 
+
 function slim(rows) {
   return rows.map(row => {
     const out = {};
@@ -100,7 +100,7 @@ function slim(rows) {
     return out;
   });
 }
- 
+
 // ═══ BÚSQUEDA ═════════════════════════════════════════════════════════════════
 function normalize(str) {
   return str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"")
@@ -120,7 +120,7 @@ function stem(word) {
 }
 const STOP = new Set(["de","del","la","el","los","las","un","una","en","para","y","a","con","por","que","se","al","es","su","sus","lo","le","les","nos","mas","sin","entre","sobre","hasta","desde","como","si","no","o","e","u"]);
 function tokenize(str) { return normalize(str).split(" ").filter(w => w.length>2 && !STOP.has(w)); }
- 
+
 // Palabras genéricas de negocio que no aportan especificidad a la búsqueda
 const BUSINESS_STOP = new Set([
   "servicio","servicios","gpg","uso","usar","usar","necesito","necesita","necesitamos",
@@ -133,7 +133,7 @@ const BUSINESS_STOP = new Set([
   "pagar","pago","costo","costo","precio","monto","importe","factura",
   "hacer","realizar","ejecutar","efectuar","llevar","cabo","fin","objetivo",
 ]);
- 
+
 // extractTerms: solo términos específicos del trabajo/servicio solicitado.
 // Filtra palabras genéricas de negocio y stopwords gramaticales.
 function extractTerms(msg) {
@@ -150,18 +150,18 @@ function extractTerms(msg) {
 // Raíces de acciones de servicio. Si la consulta contiene una acción,
 // los resultados DEBEN matchear esa acción (no solo el lugar/equipo).
 const ACTION_STEMS = ["pint","limpi","lav","repar","manten","fabric","instal","cambi","reemplaz","sustitu","suministr","montaj","mont","soldad","sold","calibr","inspecc","certific","alquil","fumig","desinfecc","recubr","sandblast","overhaul","rebobin","engras","lubric","impresion","confeccion"];
- 
+
 function isActionTerm(term) {
   const st = stem(normalize(term));
   const nm = normalize(term);
   return ACTION_STEMS.some(a => st.startsWith(a) || nm.startsWith(a));
 }
- 
+
 function findSimilar(poLines, terms, limit=5) {
   if (!poLines?.length || !terms?.length) return [];
   const qn = terms.map(t=>({ raw:normalize(t), stem:stem(normalize(t)), isAction:isActionTerm(t) }));
   const queryHasAction = qn.some(q=>q.isAction);
- 
+
   const scored = poLines.map(line => {
     const raw = normalize(line.Part_Description||line.Part_Descripcion||line.part_description||line.part_descripcion||"");
     const words = tokenize(raw); const stems = words.map(w=>stem(w));
@@ -180,20 +180,20 @@ function findSimilar(poLines, terms, limit=5) {
     }
     return { line, score, actionMatched };
   }).filter(x=>x.score>=2); // exigir al menos 2 puntos para evitar falsos positivos por términos genéricos
- 
+
   // Si la consulta tiene una acción de servicio, exigirla en los resultados
   const qualified = queryHasAction ? scored.filter(x=>x.actionMatched) : scored;
- 
+
   qualified.sort((a,b)=>b.score-a.score);
   return qualified.slice(0,limit).map(x=>x.line);
 }
- 
+
 // ═══ GPG / CoA ════════════════════════════════════════════════════════════════
 function buildMaps(gpgList, coaData) {
   const coaMap = new Map();
   for (const c of (coaData||[])) { const k=c.Os_Acc||c.os_acc||""; if(k) coaMap.set(k,c.Account_Definition||c.account_definition||""); }
   const IT_OS_ACC = new Set(["AT_11310_55","AT_11310_54","AT_11310_53","AT_11310_66","AT_11529_06","AT_11529_07"]);
- 
+
   const gpgMap = new Map();
   for (const g of (gpgList||[])) {
     const pn=g.Part_No||g.part_no||""; if(!pn) continue;
@@ -208,29 +208,29 @@ function buildMaps(gpgList, coaData) {
   }
   return { coaMap, gpgMap };
 }
- 
+
 function buildSystem(gpgList, coaData, lang="es") {
   const { gpgMap } = buildMaps(gpgList, coaData);
   let p = `Eres un asistente de GPG codes para APM Terminals (grupo Maersk), terminal ${TERM_LABEL}.
 Ayudas a identificar el GPG correcto para órdenes de compra en IFS10, asegurando que el gasto vaya a la cuenta contable correcta.
- 
+
 ═══════════════════════════════════════════════════════
 MARCO DE CLASIFICACIÓN AM / OT / IT (regla global APMT)
 ═══════════════════════════════════════════════════════
- 
+
 PASO 1 — DETERMINAR EL TIPO DE GASTO:
 Antes de recomendar un GPG, identifica a qué categoría pertenece el trabajo:
- 
+
 A) GASTO AM (Asset Management):
    - Mantenimiento y reparación de equipos físicos del terminal que NO son OT ni IT.
    - Ejemplos: grúas STS/RTG/SC, vehículos, infraestructura civil, edificios, tuberías, pintura, estructuras metálicas.
    - GPG: usar catálogo AM estándar (cuentas PE00xx).
- 
+
 B) GASTO OT — ejecutado por MANTENIMIENTO (Maintenance Operations):
    - El trabajo involucra sistemas OT (tecnología que monitorea/controla procesos físicos) PERO lo ejecuta o contrata el área de Mantenimiento.
    - Sistemas OT incluyen: PLCs, SCADA, actuadores, sensores, HMIs, access control, CCTV, edge management, automation systems, handheld/radio equipment, electronic displays, end point devices, firmware, gate operating system, crane/gate OCR, industrial control systems, IPCs, NRA, automation integration layer, terminal gate system, wireless connectivity, VMT, terminal operating system (TOS).
    - GPG EXCLUSIVO para este caso: G-301148 (OT cost — Maintenance scope).
- 
+
 C) GASTO OT — ejecutado por TECH (área de Tecnología/OT&A):
    - El trabajo OT lo gestiona o contrata el área de TECH/OT&A.
    - Usar el GPG OT-TECH según el tipo de gasto:
@@ -240,25 +240,25 @@ C) GASTO OT — ejecutado por TECH (área de Tecnología/OT&A):
      • G-301296 — Consultancy fee (consultoría OT externa)
      • G-301297 — Cost allocated FROM other entities (costos OT recibidos de otras entidades)
      • G-301298 — Cost allocated TO other entities (costos OT asignados a otras entidades)
- 
+
 D) GASTO IT (Information Technology):
    - Sistemas y suministros IT: desktop/laptops, cloud services, IFS, Atlas, Navis, business intelligence tools, cyber security tools, printers/scanners, workforce management system, accesorios de cómputo (mouse, teclado, cables, consumibles IT, etc.).
    - Los GPGs de categoría IT están marcados con [IT] en el catálogo — recomiéndalos igual que cualquier otro GPG.
    - Os_Acc de cuentas IT: AT_11310_55, AT_11310_54, AT_11310_53, AT_11310_66, AT_11529_06, AT_11529_07.
    - Ejemplos: G-015313 (consumables IT), G-011709 (IT accessories and cables).
    - La diferencia con OT: IT es infraestructura informática general; OT son sistemas que monitoran/controlan procesos físicos del terminal.
- 
+
 PASO 2 — PREGUNTAS DE DESCARTE (si hay ambigüedad):
 Si no está claro si es OT-Mantenimiento u OT-TECH, haz UNA sola pregunta:
 - "¿Quién emite el requerimiento de compra — el área de Mantenimiento o el área de TECH/OT?"
- 
+
 REGLA CLAVE — el gasto cae a quien lo ejecuta:
 - El GPG define a qué cuenta va el gasto, y el gasto le cae al área que emite el requerimiento.
 - Si Mantenimiento emite la PO → G-301148 (el gasto queda en presupuesto de Mantenimiento).
 - Si TECH/OT emite la PO → G-301293 al G-301298 (el gasto queda en presupuesto de TECH).
 - Si el área de Mantenimiento no quiere asumir un gasto (ej. porque internamente se acordó que las implementaciones nuevas las gestiona TECH), entonces el requerimiento debe partir de TECH con el GPG correspondiente, y viceversa.
 - En caso de duda sobre quién debe asumir el gasto, recomienda al usuario alinearse internamente antes de emitir la PO.
- 
+
 PASO 3 — FORMATO DE RESPUESTA:
 • Categoría: [AM / OT-Mantenimiento / OT-TECH / IT]
 • GPG principal recomendado: [código] — [descripción completa del GPG]
@@ -269,10 +269,10 @@ PASO 3 — FORMATO DE RESPUESTA:
   - G-XXXXXX — [descripción]: usar cuando [condición específica]
 • Usa la descripción del GPG (Part_Description) como criterio clave para discriminar entre alternativas — una descripción más específica siempre tiene preferencia sobre una genérica.
 • ⚠️ Si el historial adjunto muestra un GPG distinto al correcto, señálalo.
- 
+
 REGLA FACILITY vs CIVIL WORKS (distinción ambigua en el CoA):
 Cuando el trabajo involucre instalaciones físicas del terminal, distinguir entre:
- 
+
 ▸ ERM – Facility, external (AT_11310_25):
   Trabajos DENTRO o SOBRE edificios e instalaciones cubiertas:
   - Paredes, techos, pisos, ventanas, puertas
@@ -280,7 +280,7 @@ Cuando el trabajo involucre instalaciones físicas del terminal, distinguir entr
   - Remodelación y ampliación de espacios internos
   - Sistemas eléctricos, HVAC, plomería de edificios
   - Mantenimiento de oficinas, almacenes, talleres, salas
- 
+
 ▸ Civil Works Repair & Maintenance, external:
   Trabajos de infraestructura civil EXTERIOR del terminal:
   - Pavimentos, pistas de circulación, vías internas
@@ -288,9 +288,9 @@ Cuando el trabajo involucre instalaciones físicas del terminal, distinguir entr
   - Cercos perimetrales, muros de contención, drenajes
   - Obras de concreto en áreas operativas al aire libre
   - Canales, cunetas, sistemas de drenaje pluvial
- 
+
 ⚠️ ADVERTENCIA: Esta distinción es ambigua en el CoA global de APMT y genera dudas frecuentes incluso en el área de finanzas. Si el caso no es claro, indica al usuario que consulte con el área de Finanzas antes de emitir la PO.
- 
+
 REGLA DE USO DE DESCRIPCIÓN DEL GPG (Part_Description):
 - La descripción del GPG es el criterio más importante para discriminar entre alternativas.
 - Siempre prefiere el GPG cuya descripción sea más específica para el trabajo solicitado.
@@ -299,37 +299,38 @@ REGLA DE USO DE DESCRIPCIÓN DEL GPG (Part_Description):
 - NUNCA recomiendes un GPG de "ELECTRICAL" para trabajos que no sean eléctricos.
 - Si la descripción dice "SERVICES" o "MAINTENANCE AND REPAIR SERVICES", ese GPG es para contratar servicios externos.
 - Si la descripción dice "EQUIPMENT", ese GPG es para adquirir equipos, no contratar servicios.
- 
+
 REGLA DE CLASIFICACIÓN POR TIPO DE GASTO (crítica):
 El GPG debe reflejar el TIPO DE GASTO, NO el equipo al que se asocia el trabajo.
 El estándar del CoA clasifica por naturaleza del gasto, no por destino del trabajo.
- 
+
 Ejemplos de aplicación correcta:
 - Alquiler de manlift, andamio, grúa auxiliar para trabajar en cualquier equipo → GPG de "RENTAL" o "EQUIPMENT RENTAL", NO el GPG del equipo que se mantiene
 - Compra de consumibles o materiales para mantenimiento de RTG → GPG de "CONSUMABLES M&R", NO el GPG de RTG
 - Servicio de consultoría para optimizar mantenimiento de STS → GPG de "CONSULTANCY" o "PROFESSIONAL SERVICES", NO el GPG de STS
- 
+
 Regla general: pregúntate "¿qué se está comprando?" (un alquiler, un servicio, un consumible, una reparación directa), NO "¿para qué equipo es?".
 La excepción es cuando el GPG es específico para M&R de un equipo concreto (ej. "M&R Mobile Harbour Cranes") — en ese caso sí aplica solo para el servicio DIRECTO de mantenimiento/reparación de ese equipo, no para gastos auxiliares asociados.
- 
+
 Si el historial muestra que se usó el GPG del equipo (ej. GPG de MHC) para un alquiler de equipo auxiliar, señálalo como uso incorrecto: ⚠️ "Según el estándar CoA, el alquiler de [equipo] debe ir al GPG de Equipment Rental, independientemente del equipo en el que se use. El uso histórico de [GPG de MHC] para este concepto no es correcto."
- 
+
 REGLA CAPEX/CWIP (crítica):
 - Los GPGs marcados [CAPEX-CWIP] son EXCLUSIVAMENTE para proyectos de inversión de capital.
 - NUNCA los sugieras para trabajos ordinarios de mantenimiento, reparación o servicios.
 - Solo si el usuario indica explícitamente que es un proyecto de inversión/Capex.
- 
+
 HISTORIAL (si se adjunta):
 - Puede contener usos INCORRECTOS. Valida siempre contra las reglas anteriores.
 - NO repitas los datos del historial en texto — el sistema los muestra en tabla aparte.
- 
+
 ${T[lang].langLine}\n`;
- 
+
   if (gpgList?.length) {
     p += `\n=== CATÁLOGO DE GPGs ===\n`;
+    // Limitar a 200 GPGs para mantener el prompt dentro de límites de tokens
     let n=0;
     for (const [pn,g] of gpgMap.entries()) {
-      if (n++>500) break;
+      if (n++>200) break;
       const gpgTag = g.isCapex?"[CAPEX-CWIP]":g.isIT?"[IT]":""; p += `GPG: ${pn}${gpgTag?" "+gpgTag:""} | Desc: ${g.desc} | Cuenta: ${g.accGroup} | Os_Acc: ${g.osAcc||"N/D"} | Estándar Global: ${g.accountDef||"N/D"}\n`;
     }
   }
@@ -338,7 +339,7 @@ ${T[lang].langLine}\n`;
     const { gpgMap: gm } = buildMaps(gpgList, coaData);
     const usedOsAcc = new Set([...gm.values()].map(g=>g.osAcc).filter(Boolean));
     const filtered = coaData.filter(c=>usedOsAcc.has(c.Os_Acc||c.os_acc||""));
-    const list = filtered.length>0 ? filtered : coaData.slice(0,150);
+    const list = filtered.length>0 ? filtered.slice(0,50) : coaData.slice(0,50);
     for (const c of list)
       p += `Os_Acc: ${c.Os_Acc||c.os_acc||""} | ${c.Os_Acc_Desc||c.os_acc_desc||""} | Def: ${c.Account_Definition||c.account_definition||""}\n`;
   }
@@ -346,7 +347,7 @@ ${T[lang].langLine}\n`;
     p += `\nNOTA: No hay datos cargados. Indica al usuario que cargue los archivos Excel.`;
   return p;
 }
- 
+
 function buildPoContext(similarPo, gpgMap) {
   if (!similarPo?.length) return "";
   let block = `\n=== POs SIMILARES (referencia histórica — pueden tener GPG incorrecto) ===\n`;
@@ -360,7 +361,7 @@ function buildPoContext(similarPo, gpgMap) {
   }
   return block;
 }
- 
+
 // ═══ UI COMPONENTS ════════════════════════════════════════════════════════════
 function MarkdownText({ text }) {
   const html = text.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
@@ -369,7 +370,7 @@ function MarkdownText({ text }) {
     .replace(/\n/g,"<br/>");
   return <span dangerouslySetInnerHTML={{ __html: html }} />;
 }
- 
+
 function PoCard({ rows, t }) {
   const [exp, setExp] = useState(false);
   if (!rows?.length) return null;
@@ -409,7 +410,7 @@ function PoCard({ rows, t }) {
     </div>
   );
 }
- 
+
 function FileBtn({ label, file, onFile, id }) {
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
@@ -424,12 +425,12 @@ function FileBtn({ label, file, onFile, id }) {
     </div>
   );
 }
- 
+
 const BP = { background:"#E8481D", color:"#fff", border:"none", borderRadius:8, padding:"7px 16px", fontSize:13, fontWeight:600, cursor:"pointer" };
 const BO = { background:"#fff", color:"#475569", border:"1px solid #e2e8f0", borderRadius:8, padding:"7px 14px", fontSize:12, fontWeight:500, cursor:"pointer" };
- 
+
 const LOGO_B64 = "UklGRmIGAABXRUJQVlA4IFYGAADwIQCdASqLACgAPlEkjUUjoiETmV9sOAUEsYBq1dXlkSxVkPUB+Wt5n5gP2d6j3nAdQBz6/sa+UZqxHQDtU/qf4e/th2iHh/2C21XyK/Yn7F+P349+8v9r8F/an+8egj/D/61+R3kAbBB8n/wn9C/br8qtkh/M/7F+VXMmd0/qB8AH8k/mH+f/r35AfSF+6/9P/Feaz8v/rv/S/uX7lfQN/Jf6R/qP73/h/+z/l///4m/SG/bNRsqE/my1FSCLV7s89F/uGR6poXsOYy1wRJ24FVZ7aejqxcDVj1Pj3ugmyvBP8gCCfVMvaflyzEg3Z3a3Zk2BLqjQAtt8P+t3CajxMgsoTloptQfP9c8NVx4jQB9Xr4CnzoVAAP7+EGK0V7USWPS9JlaZgv+xxQnzf/8kXSZ2Mjjvirl8/GTjYd3VRaglafggs3F95e9+rsBYXuC/sOB+mI+IR3GZwnUMs/dqp258x3uKJhU0UjzakNuXTC4fZ3CT9mOhhxRfs0xlCrYhlU8KQ1yJrjVdDxVwTyOI3mly36U2wyHJo/GZDjnjeJ+ehLOp19Z6NOP3U6HCC+WfERxRPHhF+HpDai5tcz8b1wyy23s1Z0kND4psK4IP6G3H5+/fRyd4ccoJYj4lkhsTus12iIDXw5b39i9gYyGmreDvspX0GbP+qWTZ4Pfiih/G+9vdSSFPBrcyJ/m+IHdJaprIx1NGYxgyMo20SueQ7lIUbNtkosfSR7gOoAp3U0VNq+/uviBEH28rCgJUp1+h3N0L35XqPedizs4HD6arIV5DANtYaWsdNCYTfzstT/EWaniHLnt00QpFnKjHhzjXllFgudGIbhOC7tiF2tlCy4Td6JgzpHjd0x34KaCI+i3lIsV3PrGACIc9vq1GaRHcnPSngSXvGGVI45QlJ7lUFIrFLYNNezpKH4gE8UN6sxyILBd5V5TG3tVa3nPhyxZiaWvFoTVh7iQ6PxCWLT4pFcttv2q2IFNw3GYPrNYW9UFrrF90U01o4AxxcEjEhtNVgvfsX7sjw+ta5s+t2TvfcSD91MKNARXzl2y9gfKlCtZnHE7onb+Yr8Oyvo637Dh9ksaMY20t/MC9KwrTwRUSL47r/eyp/pTCsFw1AEMtybeWX+DKvb8oRWonfM8FwBK4iborfhpVw5e/PDU3ml+9CFNLm0lJiypDMx0BdI5KmeLgZi1dSeTKjJf6aovuRXnTfieqKlZmX4eH9uN1DECPiSwCwfK+GG7sLhCJs6kKAfCl3u7j7tr3Zq0mW/xGfu54GhCCkH3iTsU3fRnnijLcYmJjCNMsqZGsBVVmGM9freWEsTzRPMh0Qx9Tbi6fYTpY9UnnQGiD2/U46fW8nVS03QwMNMrjcB/R9QmeV+sf53J+Fsi9LYW8IjqW0j6CmT7zIqkGgra5QqlBZCJ1jbxDc50xIpGKELDr1cV81gdzX0riRa90Tuvklral5hdrhC3jMa4SF//1If4RX0Vl//IWCVEs0OOW+sfgHGWfcO80d+znz0Zu4s4g2a86TTE3shq/JX11CgAzwMeYiMol+hVojDog8h5kvn2jS3zCZ+8AGEgy1tkx/4ww/mx7RS03D/f4j8av5EGiHMDBzKfqtWF6z9Q4pGX48FXMoQ17C/w0dp0KHyz5DK4KZHSDRBgMUv/l+s8SuIKfXa7j8zk2k0KYHDdhRiQJ4tSjH2DTSMAQK67j5fdZU0L9fOCWNxQtgv614w/B5HVUszHFSgyZ/75Bev8g2PQfNFHDaDspG8mApJnDT+d7/gtCoQ44SyXqv0bz1RgPZBzhvefU4YOzUb1vJNSi84JFYwJy8PS/cgGrlWlB8lXeRBtpIG8eUzCR6w+tUAnSdSeyu1hilkhCkK09qM/tAo0d8A5yO7fVT9kngXmHT0TjaenPiBI72Q65K10bP8JvUXfiabcNoJq7Xf9lcru/ljLzkwrXwLR7Aloc60NTL/W0Kwswa+m7OYrbe3csH/5AGBvbNc7uJfI+t4hk2R2BLH0G3Pj5pXXUQYZXNTGxCEtMguZ3c05yf5VzqYGu2Q3iMs5IqqInVtbrmDbYBHMsBAxpXqNW6ykY4sPSf2hArwVpnaxN1PeoW3smD2C0DW76BNRY2/zS+2C9HKXEqCoQSaNQzJzUqCw+XP6LLoAd4AAAAA==";
- 
+
 // ═══ APP ══════════════════════════════════════════════════════════════════════
 export default function App() {
   const [gpgList,   setGpgList]   = useState(null);
@@ -439,11 +440,11 @@ export default function App() {
   const [loading,   setLoading]   = useState(true);
   const [lang,      setLang]      = useState("es");
   const t = T[lang];
- 
+
   const [messages,    setMessages]    = useState([{ role:"assistant", content:T.es.welcome, poRows:null }]);
   const [input,       setInput]       = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
- 
+
   const [showUpload, setShowUpload] = useState(false);
   const [authed,     setAuthed]     = useState(false);
   const [showPw,     setShowPw]     = useState(false);
@@ -455,17 +456,17 @@ export default function App() {
   const [coaF,       setCoaF]       = useState(null);
   const [uploading,  setUploading]  = useState(false);
   const [uploadMsg,  setUploadMsg]  = useState(null);
- 
+
   const endRef   = useRef(null);
   const abortRef = useRef(null);
   const gpgRef   = useRef(null);
   const poRef    = useRef(null);
   const coaRef   = useRef(null);
- 
+
   useEffect(()=>{ gpgRef.current=gpgList; },[gpgList]);
   useEffect(()=>{ poRef.current=poLines;  },[poLines]);
   useEffect(()=>{ coaRef.current=coaData; },[coaData]);
- 
+
   // Cargar datos: pedir URLs firmadas y descargar los blobs directamente
   useEffect(()=>{
     (async()=>{
@@ -493,11 +494,11 @@ export default function App() {
       setLoading(false);
     })();
   },[]);
- 
+
   useEffect(()=>{ endRef.current?.scrollIntoView({ behavior:"smooth" }); },[messages]);
- 
+
   const dataLoaded = !!(gpgList?.length || poLines?.length);
- 
+
   // ── SEND ──────────────────────────────────────────────────────────────────
   const handleSend = async () => {
     if (!input.trim() || isStreaming) return;
@@ -512,24 +513,24 @@ export default function App() {
       const pn = l.Part_No||l.part_no||"";
       return !gpgMap.get(pn)?.isCapex;
     });
-    const similar = findSimilar(poSinCapex, terms, 5);
- 
+    const similar = findSimilar(poSinCapex, terms, 3);
+
     const newMsgs = [...messages, { role:"user", content:msg, poRows:null }];
     setMessages(newMsgs);
     setIsStreaming(true);
     setMessages(prev=>[...prev,{ role:"assistant", content:"", streaming:true, poRows:null }]);
- 
+
     const ctrl = new AbortController(); abortRef.current = ctrl;
     try {
       const system  = buildSystem(currGpg, currCoa, lang) + buildPoContext(similar, gpgMap);
       const apiMsgs = newMsgs.map(m=>({ role:m.role, content:m.content }));
- 
+
       const res = await fetch("/api/chat", {
         method:"POST", signal:ctrl.signal,
         headers:{ "Content-Type":"application/json" },
         body: JSON.stringify({ system, messages:apiMsgs }),
       });
- 
+
       if (!res.ok) throw new Error(`API ${res.status}`);
       const reader=res.body.getReader(); const dec=new TextDecoder();
       let buf="", full="";
@@ -555,10 +556,10 @@ export default function App() {
         setMessages(prev=>{ const u=[...prev]; u[u.length-1]={role:"assistant",content:t.errorMsg,streaming:false,poRows:null}; return u; });
     } finally { setIsStreaming(false); abortRef.current=null; }
   };
- 
+
   const handleKey=(e)=>{ if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();handleSend();} };
   const handleNew=()=>{ if(isStreaming)abortRef.current?.abort(); setMessages([{role:"assistant",content:t.welcome,poRows:null}]); setInput(""); };
- 
+
   // ── UPLOAD ────────────────────────────────────────────────────────────────
   const handleCargar=()=>{ if(authed){setShowUpload(v=>!v);setUploadMsg(null);}else{setPwInput("");setPwError(null);setShowPw(true);} };
   const adminPwRef = useRef("");
@@ -582,7 +583,7 @@ export default function App() {
     }
     setPwBusy(false);
   };
- 
+
   const handleUpload=async()=>{
     if(!gpgF&&!poF&&!coaF)return; setUploading(true); setUploadMsg(null);
     try {
@@ -591,11 +592,11 @@ export default function App() {
       if (gpgF) form.append("gpglist", gpgF);
       if (poF)  form.append("polines", poF);
       if (coaF) form.append("coa", coaF);
- 
+
       const res  = await fetch("/api/upload", { method:"POST", headers:{ "x-admin-password": adminPwRef.current }, body:form });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error||`Error ${res.status}`);
- 
+
       // Actualizar estado local
       if (gpgF) { const d=slim(await parseExcel(gpgF)); setGpgList(d); }
       if (poF)  { const d=slim(await parseExcel(poF));  setPoLines(d); }
@@ -606,18 +607,18 @@ export default function App() {
     } catch(err) { setUploadMsg("Error: "+err.message); }
     setUploading(false);
   };
- 
+
   // ── RENDER ────────────────────────────────────────────────────────────────
   return (
     <div style={{ display:"flex", flexDirection:"column", height:"100vh", fontFamily:"'Maersk Text Office','Nunito Sans','Segoe UI',sans-serif", background:"#f8f9fa", color:"#1a2332" }}>
- 
+
       {loading && (
         <div style={{ position:"fixed", inset:0, background:"rgba(255,255,255,.9)", zIndex:200, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:12 }}>
           <div style={{ width:36, height:36, border:"3px solid #e2e8f0", borderTop:"3px solid #E8481D", borderRadius:"50%", animation:"spin .8s linear infinite" }} />
           <p style={{ fontSize:13, color:"#64748b" }}>{t.loading(TERM_LABEL)}</p>
         </div>
       )}
- 
+
       {/* HEADER */}
       <header style={{ height:70, background:"#fff", borderBottom:"1px solid #e2e8f0", display:"flex", alignItems:"center", padding:"0 20px", gap:16, flexShrink:0, boxShadow:"0 1px 4px rgba(0,0,0,.06)" }}>
         <img src={`data:image/webp;base64,${LOGO_B64}`} alt="APM Terminals" style={{ height:50, width:"auto", flexShrink:0, objectFit:"contain" }} />
@@ -648,7 +649,7 @@ export default function App() {
           ))}
         </div>
       </header>
- 
+
       {/* UPLOAD PANEL */}
       {showUpload && (
         <div style={{ background:"#f1f5f9", borderBottom:"1px solid #e2e8f0", padding:"12px 20px", flexShrink:0 }}>
@@ -675,7 +676,7 @@ export default function App() {
           {uploadMsg && <p style={{ marginTop:8, fontSize:12, color:uploadMsg.startsWith("✓")?"#16a34a":"#dc2626" }}>{uploadMsg}</p>}
         </div>
       )}
- 
+
       {/* MESSAGES */}
       <div style={{ flex:1, overflowY:"auto", padding:"20px 20px 8px" }}>
         <div style={{ maxWidth:800, margin:"0 auto", display:"flex", flexDirection:"column", gap:16 }}>
@@ -696,7 +697,7 @@ export default function App() {
           <div ref={endRef}/>
         </div>
       </div>
- 
+
       {/* INPUT */}
       <div style={{ padding:"12px 20px 16px", background:"#fff", borderTop:"1px solid #e2e8f0", flexShrink:0 }}>
         <div style={{ maxWidth:800, margin:"0 auto", display:"flex", gap:8, alignItems:"flex-end" }}>
@@ -714,7 +715,7 @@ export default function App() {
           <span style={{ color:"#cbd5e1" }}>Elaborado por Franco D' Achille — APMT T4</span>
         </p>
       </div>
- 
+
       {/* PASSWORD MODAL */}
       {showPw && (
         <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.5)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:50, padding:20 }} onClick={()=>setShowPw(false)}>
@@ -734,7 +735,7 @@ export default function App() {
           </div>
         </div>
       )}
- 
+
       <style>{`@keyframes blink{0%,100%{opacity:1}50%{opacity:0}} @keyframes spin{to{transform:rotate(360deg)}}`}</style>
     </div>
   );
