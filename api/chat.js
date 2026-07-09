@@ -18,7 +18,7 @@ module.exports = async function handler(req, res) {
   }
  
   try {
-    const model = "gemini-2.0-flash"; // más rápido, evita timeout
+    const model = "Gemini 2.5 Flash"; // más rápido, evita timeout
     const url   = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${process.env.GEMINI_API_KEY}`;
  
     const response = await fetch(url, {
