@@ -170,15 +170,18 @@ function findRelevantGpgs(gpgMap, terms, maxResults=40) {
 
 // Palabras genéricas de negocio que no aportan especificidad a la búsqueda
 const BUSINESS_STOP = new Set([
-  "servicio","servicios","gpg","uso","usar","usar","necesito","necesita","necesitamos",
+  "servicio","servicios","gpg","uso","usar","necesito","necesita","necesitamos",
   "contratar","contrato","contratacion","comprar","compra","adquirir","adquisicion",
   "solicitar","solicitud","requerimiento","requiero","requiere","pedido","orden",
   "trabajo","trabajos","labores","actividad","actividades","tarea","tareas",
   "proveedor","empresa","contratista","externo","externa","externos",
-  "cual","cuales","que","como","donde","cuando","quien","quiero","quiere",
+  "cual","cuales","como","donde","cuando","quien","quiero","quiere",
   "nuevo","nueva","existente","actual","general","especifico","tipo","tipos",
-  "pagar","pago","costo","costo","precio","monto","importe","factura",
+  "pagar","pago","costo","precio","monto","importe","factura",
   "hacer","realizar","ejecutar","efectuar","llevar","cabo","fin","objetivo",
+  // Términos de mantenimiento genéricos que aparecen en casi todas las POs
+  "mantenimiento","preventivo","correctivo","mensual","anual","trimestral",
+  "periodo","mes","meses","semana","semanas","horas","hora","dias","año",
 ]);
 
 // extractTerms: solo términos específicos del trabajo/servicio solicitado.
@@ -261,7 +264,7 @@ function buildMaps(gpgList, coaData) {
   return { coaMap, gpgMap };
 }
 
-function buildSystem(gpgList, coaData, lang="es", relevantGpgs=null) {
+function buildSystem(gpgList, coaData, lang="es", relevantGpgs=null, excludeIT=false) {
   const { gpgMap } = buildMaps(gpgList, coaData);
   // Use relevant GPGs if provided, otherwise use full map
   const gpgsToShow = relevantGpgs || [...gpgMap.entries()].map(([pn,g]) => ({pn,g}));
@@ -297,7 +300,7 @@ C) GASTO OT — ejecutado por TECH (área de Tecnología/OT&A):
 
 D) GASTO IT (Information Technology):
    - Sistemas y suministros IT: desktop/laptops, cloud services, IFS, Atlas, Navis, business intelligence tools, cyber security tools, printers/scanners, workforce management system, accesorios de cómputo (mouse, teclado, cables, consumibles IT, etc.).
-   - Los GPGs de categoría IT están marcados con [IT] en el catálogo — recomiéndalos igual que cualquier otro GPG.
+   - Los GPGs marcados [IT] SOLO aplican para gastos de tecnología informática. NUNCA los uses para equipos físicos (manlifts, grúas, vehículos, maquinaria), trabajos de mantenimiento físico o alquileres de maquinaria operativa. Si un GPG dice "IT HARDWARE LEASE" o similar y el trabajo es físico, ese GPG NO aplica.
    - Os_Acc de cuentas IT: AT_11310_55, AT_11310_54, AT_11310_53, AT_11310_66, AT_11529_06, AT_11529_07.
    - Ejemplos: G-015313 (consumables IT), G-011709 (IT accessories and cables).
    - La diferencia con OT: IT es infraestructura informática general; OT son sistemas que monitoran/controlan procesos físicos del terminal.
@@ -397,8 +400,8 @@ ${T[lang].langLine}\n`;
     p += `\n=== CATÁLOGO DE GPGs ===\n`;
     let n=0;
     for (const [pn,g] of gpgMap.entries()) {
-      if (n++>500) break;
-      const gpgTag = g.isCapex?"[CAPEX]":g.isIT?"[IT]":"";
+      if (excludeIT && g.isIT) continue; // Skip IT GPGs for physical work
+      const gpgTag = g.isCapex?"[CAPEX]":"";
       p += `${pn}${gpgTag?" "+gpgTag:""} | ${g.desc} | ${g.accGroup} | ${g.accountDef||"N/D"}\n`;
     }
   }
@@ -590,7 +593,11 @@ export default function App() {
 
     const ctrl = new AbortController(); abortRef.current = ctrl;
     try {
-      const system  = buildSystem(currGpg, currCoa, lang) + buildPoContext(similar, gpgMap);
+      // Detect if query is about physical/AM work to filter IT GPGs
+      const physicalTerms = ["mantenimiento","reparacion","grua","rtg","sts","mhc","sc","reach","stacker","vehiculo","manlift","andamio","pintura","civil","estructura","soldadura","hidraulico","neumatico","motor","bomba","valvula","compresor","luminaria","alquiler","arriendo","renta"];
+      const msgLower = msg.toLowerCase();
+      const isPhysicalWork = physicalTerms.some(t => msgLower.includes(t));
+      const system  = buildSystem(currGpg, currCoa, lang, null, isPhysicalWork) + buildPoContext(similar, gpgMap);
       const apiMsgs = newMsgs.map(m=>({ role:m.role, content:m.content }));
 
       const res = await fetch("/api/chat", {
