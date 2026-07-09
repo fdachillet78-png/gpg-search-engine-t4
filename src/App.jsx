@@ -243,6 +243,9 @@ function buildMaps(gpgList, coaData) {
   const coaMap = new Map();
   for (const c of (coaData||[])) { const k=c.Os_Acc||c.os_acc||""; if(k) coaMap.set(k,c.Account_Definition||c.account_definition||""); }
   const IT_OS_ACC = new Set(["AT_11310_55","AT_11310_54","AT_11310_53","AT_11310_66","AT_11529_06","AT_11529_07"]);
+  // GPGs that have misleading descriptions and should always be excluded from physical work context
+  // These are IT lease/hardware GPGs that could be confused with equipment rental
+  const IT_LEASE_OS_ACC = new Set(["AT_11031_01"]); // Office/PC leasing — never for physical equipment
 
   const gpgMap = new Map();
   for (const g of (gpgList||[])) {
@@ -252,7 +255,7 @@ function buildMaps(gpgList, coaData) {
     const osAcc=g.Os_Acc||g.os_acc||"";
     const accGroupDesc = g.Acc_Group_Desc||g.acc_group_desc||"";
     const isCapex = accGroupDesc.toUpperCase().includes("CWIP");
-    const isIT    = IT_OS_ACC.has(osAcc);
+    const isIT    = IT_OS_ACC.has(osAcc) || IT_LEASE_OS_ACC.has(osAcc);
     const desc = g.Part_Description||g.Part_Descripcion||g.part_description||g.part_descripcion||"";
     const accountDef = osAcc?(coaMap.get(osAcc)||""):"";
     const existing = gpgMap.get(pn);
@@ -307,21 +310,24 @@ D) GASTO IT (Information Technology):
 
 PASO 2 — PREGUNTAS DE DESCARTE (OBLIGATORIO — NO OMITIR):
 
-ANTES de recomendar un GPG, verifica si falta información crítica. Si falta, haz la pregunta y DETENTE — no recomiendes nada hasta tener la respuesta.
+PREGUNTA INICIAL OBLIGATORIA — SIEMPRE la primera en cualquier consulta:
+Responde con este formato exacto:
+'¿Quién emite el requerimiento de compra?
+1. Área de Mantenimiento
+2. Área de TECH/OT'
 
-CASO 1 — ALQUILER DE EQUIPO:
-Si el usuario menciona alquiler/renta/arrendamiento y NO dice la duración:
-→ PREGUNTA: "¿El alquiler será por menos de 1 mes o más de 1 mes?"
-→ NO recomiendes ningún GPG hasta recibir la respuesta.
-→ Menos de 1 mes: usar GPG de Equipment Rental (Less Than 1 Month)
-→ Más de 1 mes: usar GPG de Lease Equipment/Machinery (More Than 1 Month)
+→ NO hagas ninguna recomendación hasta recibir la respuesta.
+→ Si el usuario responde '1' o 'mantenimiento' → solo GPGs AM. NO uses GPGs OT-TECH ni IT.
+→ Si el usuario responde '2' o 'tech' o 'ot' → usar ÚNICAMENTE G-301293, G-301294, G-301295, G-301296, G-301297, G-301298.
 
-CASO 2 — OT sin saber quién ejecuta:
-Si el trabajo involucra sistemas OT y no sabes quién emite la PO:
-→ PREGUNTA: "¿Quién emite el requerimiento — Mantenimiento o TECH/OT?"
+CASO 2 — ALQUILER (después de saber quién ejecuta):
+Si es alquiler/renta y NO especifica duración:
+→ PREGUNTA: '¿El alquiler será por menos de 1 mes o más de 1 mes?'
+→ Menos de 1 mes: GPG de Equipment Rental (Less Than 1 Month)
+→ Más de 1 mes: GPG de Lease Equipment/Machinery (More Than 1 Month)
 
-CASO 3 — FACILITY vs CIVIL WORKS sin contexto claro:
-→ PREGUNTA: "¿El trabajo es dentro de un edificio o en infraestructura exterior (pavimentos, muelles)?"
+CASO 3 — FACILITY vs CIVIL WORKS:
+→ PREGUNTA: '¿El trabajo es dentro de un edificio o en infraestructura exterior?'
 
 REGLA ABSOLUTA: Una sola pregunta a la vez. ESPERA la respuesta. NO asumas.
 
@@ -593,11 +599,13 @@ export default function App() {
 
     const ctrl = new AbortController(); abortRef.current = ctrl;
     try {
-      // Detect if query is about physical/AM work to filter IT GPGs
-      const physicalTerms = ["mantenimiento","reparacion","grua","rtg","sts","mhc","sc","reach","stacker","vehiculo","manlift","andamio","pintura","civil","estructura","soldadura","hidraulico","neumatico","motor","bomba","valvula","compresor","luminaria","alquiler","arriendo","renta"];
-      const msgLower = msg.toLowerCase();
-      const isPhysicalWork = physicalTerms.some(t => msgLower.includes(t));
-      const system  = buildSystem(currGpg, currCoa, lang, null, isPhysicalWork) + buildPoContext(similar, gpgMap);
+      // Detect executor from conversation history to filter catalog
+      const allText = [...newMsgs].map(m => m.content.toLowerCase()).join(" ");
+      const isMaintenance = /mantenimiento|maintenance/.test(allText);
+      const isTech = /tech|ot|ota|tecnolog/.test(allText) && !isMaintenance;
+      // Filter: if maintenance → exclude IT; if tech → exclude AM (handled in prompt)
+      const excludeIT = isMaintenance || /manlift|grua|rtg|sts|mhc|andamio|pintura|civil|soldadura|neumatico|luminaria/.test(allText);
+      const system  = buildSystem(currGpg, currCoa, lang, null, excludeIT) + buildPoContext(similar, gpgMap);
       const apiMsgs = newMsgs.map(m=>({ role:m.role, content:m.content }));
 
       const res = await fetch("/api/chat", {
