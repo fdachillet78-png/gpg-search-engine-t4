@@ -391,8 +391,10 @@ HISTORIAL (si se adjunta):
 ${T[lang].langLine}\n`;
 
   if (gpgList?.length) {
-    p += `\n=== GPGs RELEVANTES PARA ESTA CONSULTA ===\n`;
-    for (const {pn, g} of gpgsToShow) {
+    p += `\n=== CATÁLOGO DE GPGs ===\n`;
+    let n=0;
+    for (const [pn,g] of gpgMap.entries()) {
+      if (n++>500) break;
       const gpgTag = g.isCapex?"[CAPEX]":g.isIT?"[IT]":"";
       p += `${pn}${gpgTag?" "+gpgTag:""} | ${g.desc} | ${g.accGroup} | ${g.accountDef||"N/D"}\n`;
     }
@@ -585,9 +587,7 @@ export default function App() {
 
     const ctrl = new AbortController(); abortRef.current = ctrl;
     try {
-      // Find relevant GPGs for this specific query (reduces prompt from 40K to ~5K chars)
-      const relevantGpgs = findRelevantGpgs(gpgMap, terms, 40);
-      const system  = buildSystem(currGpg, currCoa, lang, relevantGpgs) + buildPoContext(similar, gpgMap);
+      const system  = buildSystem(currGpg, currCoa, lang) + buildPoContext(similar, gpgMap);
       const apiMsgs = newMsgs.map(m=>({ role:m.role, content:m.content }));
 
       const res = await fetch("/api/chat", {
