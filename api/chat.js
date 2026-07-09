@@ -1,24 +1,30 @@
-// api/chat.js — Proxy hacia Google Gemini API con streaming
+// api/chat.js — Proxy Gemini con prompt mínimo y GPGs pre-seleccionados
 module.exports = async function handler(req, res) {
   if (req.method !== "POST")
     return res.status(405).json({ error: "Method not allowed" });
 
   const { system, messages } = req.body;
 
-  const CRITICAL = `REGLAS CRÍTICAS — SEGUIR SIEMPRE SIN EXCEPCIÓN:
-1. ALQUILER DE EQUIPO: Si el usuario menciona alquiler/renta/arrendamiento de equipo y NO especifica la duración, responde ÚNICAMENTE con la pregunta "¿El alquiler será por menos de 1 mes o más de 1 mes?" y NO recomiendes ningún GPG hasta recibir la respuesta.
-   - Menos de 1 mes → busca en el catálogo un GPG con "RENTAL" y "LESS THAN 1 MONTH" o "SHORT TERM" en su descripción (ej. G-301641 si existe)
-   - Más de 1 mes → busca en el catálogo un GPG con "LEASE" y "MORE THAN 1 MONTH" en su descripción (ej. G-301632 si existe)
-   - Si existe un GPG específico para la duración indicada, DEBES usarlo. No digas "no existe" si el catálogo lo tiene.
-2. Usa SOLO GPGs del catálogo proporcionado. Busca cuidadosamente en TODO el catálogo antes de decir que un GPG no existe.
-3. Si hay ambigüedad, haz UNA sola pregunta y espera respuesta antes de recomendar.
-`;
+  // Extraer solo la sección de GPGs relevantes y PO context del system prompt
+  // El system prompt completo es demasiado grande para Gemini
+  let shortSystem = system || "";
+  
+  // Tomar solo: reglas críticas (primeras ~2000 chars) + sección GPGs relevantes
+  const gpgSectionStart = shortSystem.indexOf("=== GPGs RELEVANTES");
+  const gpgSectionEnd   = shortSystem.indexOf("=== POs SIMILARES");
+  const poSectionStart  = shortSystem.indexOf("=== POs SIMILARES");
+  
+  if (gpgSectionStart > 0) {
+    const rules    = shortSystem.substring(0, Math.min(3000, gpgSectionStart));
+    const gpgs     = gpgSectionStart > 0 ? shortSystem.substring(gpgSectionStart, gpgSectionEnd > 0 ? gpgSectionEnd : gpgSectionStart + 8000) : "";
+    const pos      = poSectionStart > 0  ? shortSystem.substring(poSectionStart, poSectionStart + 2000) : "";
+    shortSystem = rules + gpgs + pos;
+  }
 
   const contents = [];
-  if (system) {
-    contents.push({ role: "user",  parts: [{ text: `[INSTRUCCIONES]\n${CRITICAL}\n${system}` }] });
-    contents.push({ role: "model", parts: [{ text: "Entendido. Seguiré las reglas críticas." }] });
-  }
+  contents.push({ role: "user",  parts: [{ text: `[INSTRUCCIONES]\n${shortSystem}` }] });
+  contents.push({ role: "model", parts: [{ text: "Entendido. Seguiré las instrucciones." }] });
+
   for (const m of (messages || [])) {
     contents.push({
       role:  m.role === "assistant" ? "model" : "user",
@@ -35,10 +41,7 @@ module.exports = async function handler(req, res) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         contents,
-        generationConfig: {
-          maxOutputTokens: 2000,
-          temperature:     0.2,
-        },
+        generationConfig: { maxOutputTokens: 1500, temperature: 0.1 },
       }),
     });
 
@@ -73,7 +76,6 @@ module.exports = async function handler(req, res) {
         } catch {}
       }
     }
-
     res.write("data: [DONE]\n\n");
     res.end();
 
