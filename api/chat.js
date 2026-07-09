@@ -1,4 +1,4 @@
-// api/chat.js — Proxy hacia Google Gemini API (sin streaming, evita timeout)
+// api/chat.js — Proxy hacia Google Gemini API (sin streaming, respuesta completa)
 module.exports = async function handler(req, res) {
   if (req.method !== "POST")
     return res.status(405).json({ error: "Method not allowed" });
@@ -18,8 +18,7 @@ module.exports = async function handler(req, res) {
   }
  
   try {
-    // Sin streaming — respuesta completa de una vez
-    const model = "gemini-flash-latest";
+    const model = "gemini-2.5-flash-lite";
     const url   = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`;
  
     const response = await fetch(url, {
@@ -35,14 +34,14 @@ module.exports = async function handler(req, res) {
     });
  
     if (!response.ok) {
-      const err = await response.json();
+      const err = await response.json().catch(() => ({}));
       return res.status(response.status).json(err);
     }
  
     const data = await response.json();
     const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
  
-    // Devolver en formato compatible con el frontend (simula un chunk SSE completo)
+    // Formato SSE compatible con el frontend
     res.setHeader("Content-Type", "text/event-stream");
     res.write(`data: ${JSON.stringify({ type:"content_block_delta", delta:{ type:"text_delta", text } })}\n\n`);
     res.write("data: [DONE]\n\n");
