@@ -345,7 +345,7 @@ ${T[lang].langLine}\n`;
     p += `\n=== CATÁLOGO DE GPGs ===\n`;
     let n=0;
     for (const [pn,g] of gpgMap.entries()) {
-      if (n++>300) break;
+      if (n++>500) break;
       const gpgTag = g.isCapex?"[CAPEX-CWIP]":g.isIT?"[IT]":""; p += `GPG: ${pn}${gpgTag?" "+gpgTag:""} | Desc: ${g.desc} | Cuenta: ${g.accGroup} | Os_Acc: ${g.osAcc||"N/D"} | Estándar Global: ${g.accountDef||"N/D"}\n`;
     }
   }
