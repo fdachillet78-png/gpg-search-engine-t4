@@ -6,7 +6,7 @@ import * as XLSX from "xlsx";
 // t4.vercel.app      → T4
 // localhost/callao   → Callao (desarrollo)
 function detectTerminal() {
-  return "t4"; // Terminal fija: T4
+  return "t4";
 }
 
 const TERMINAL   = detectTerminal();
@@ -246,12 +246,17 @@ function buildMaps(gpgList, coaData) {
     const pn=g.Part_No||g.part_no||""; if(!pn) continue;
     const osAccDesc = (g.Os_Acc_Desc||g.os_acc_desc||"").trim();
     if (osAccDesc.toLowerCase().endsWith("internal")) continue;
-    if (gpgMap.has(pn)) continue;
     const osAcc=g.Os_Acc||g.os_acc||"";
     const accGroupDesc = g.Acc_Group_Desc||g.acc_group_desc||"";
     const isCapex = accGroupDesc.toUpperCase().includes("CWIP");
     const isIT    = IT_OS_ACC.has(osAcc);
-    gpgMap.set(pn,{ osAcc, osAccDesc, accountDef:osAcc?(coaMap.get(osAcc)||""):"", desc:g.Part_Description||g.Part_Descripcion||g.part_description||g.part_descripcion||"", accGroup:`${g.Acc_Group||""} - ${accGroupDesc}`, isCapex, isIT });
+    const desc = g.Part_Description||g.Part_Descripcion||g.part_description||g.part_descripcion||"";
+    const accountDef = osAcc?(coaMap.get(osAcc)||""):"";
+    const existing = gpgMap.get(pn);
+    // Keep first entry unless it has no accountDef and this one does
+    if (!existing || (!existing.accountDef && accountDef)) {
+      gpgMap.set(pn,{ osAcc, osAccDesc, accountDef, desc, accGroup:`${g.Acc_Group||""} - ${accGroupDesc}`, isCapex, isIT });
+    }
   }
   return { coaMap, gpgMap };
 }
