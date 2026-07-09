@@ -1,35 +1,30 @@
-// api/chat.js — Proxy hacia Google Gemini API (sin streaming, respuesta completa)
+// api/chat.js — Proxy hacia Groq API (gratuito, sin restricción geográfica)
 module.exports = async function handler(req, res) {
   if (req.method !== "POST")
     return res.status(405).json({ error: "Method not allowed" });
  
   const { system, messages } = req.body;
  
-  const contents = [];
-  if (system) {
-    contents.push({ role: "user",  parts: [{ text: `[INSTRUCCIONES]\n${system}` }] });
-    contents.push({ role: "model", parts: [{ text: "Entendido." }] });
-  }
+  // Groq usa formato compatible con OpenAI
+  const groqMessages = [];
+  if (system) groqMessages.push({ role: "system", content: system });
   for (const m of (messages || [])) {
-    contents.push({
-      role:  m.role === "assistant" ? "model" : "user",
-      parts: [{ text: m.content }],
-    });
+    groqMessages.push({ role: m.role, content: m.content });
   }
  
   try {
-    const model = "gemini-2.0-flash-001";
-    const url   = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`;
- 
-    const response = await fetch(url, {
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method:  "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type":  "application/json",
+        "Authorization": `Bearer ${process.env.GROQ_API_KEY}`,
+      },
       body: JSON.stringify({
-        contents,
-        generationConfig: {
-          maxOutputTokens: 1000,
-          temperature:     0.2,
-        },
+        model:       "llama-3.3-70b-versatile", // el más capaz en tier gratuito
+        messages:    groqMessages,
+        max_tokens:  1000,
+        temperature: 0.2,
+        stream:      false,
       }),
     });
  
@@ -39,7 +34,7 @@ module.exports = async function handler(req, res) {
     }
  
     const data = await response.json();
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    const text = data?.choices?.[0]?.message?.content || "";
  
     // Formato SSE compatible con el frontend
     res.setHeader("Content-Type", "text/event-stream");
@@ -51,3 +46,4 @@ module.exports = async function handler(req, res) {
     res.status(500).json({ error: err.message });
   }
 };
+ 
