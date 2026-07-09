@@ -267,20 +267,10 @@ function buildMaps(gpgList, coaData) {
   return { coaMap, gpgMap };
 }
 
-function buildSystem(gpgList, coaData, lang="es", relevantGpgs=null, excludeIT=false) {
+function buildSystem(gpgList, coaData, lang="es") {
   const { gpgMap } = buildMaps(gpgList, coaData);
-  // Use relevant GPGs if provided, otherwise use full map
-  const gpgsToShow = relevantGpgs || [...gpgMap.entries()].map(([pn,g]) => ({pn,g}));
   let p = `Eres un asistente de GPG codes para APM Terminals (grupo Maersk), terminal ${TERM_LABEL}.
 Ayudas a identificar el GPG correcto para órdenes de compra en IFS10, asegurando que el gasto vaya a la cuenta contable correcta.
-
-⚠️ REGLA #1 — PRIMERA PREGUNTA OBLIGATORIA SIN EXCEPCIÓN:
-En CADA consulta nueva, tu PRIMERA respuesta debe ser SIEMPRE esta pregunta (y SOLO esta pregunta):
-"¿Quién emite el requerimiento de compra?
-1. Área de Mantenimiento
-2. Área de TECH/OT"
-NO respondas nada más. NO recomiendes GPGs. NO hagas análisis. SOLO esta pregunta.
-Después de recibir la respuesta (1 o 2), entonces procedes con el análisis y recomendación.
 
 ═══════════════════════════════════════════════════════
 MARCO DE CLASIFICACIÓN AM / OT / IT (regla global APMT)
@@ -317,16 +307,6 @@ D) GASTO IT (Information Technology):
    - La diferencia con OT: IT es infraestructura informática general; OT son sistemas que monitoran/controlan procesos físicos del terminal.
 
 PASO 2 — PREGUNTAS DE DESCARTE (OBLIGATORIO — NO OMITIR):
-
-PREGUNTA INICIAL OBLIGATORIA — SIEMPRE la primera en cualquier consulta:
-Responde con este formato exacto:
-'¿Quién emite el requerimiento de compra?
-1. Área de Mantenimiento
-2. Área de TECH/OT'
-
-→ NO hagas ninguna recomendación hasta recibir la respuesta.
-→ Si el usuario responde '1' o 'mantenimiento' → solo GPGs AM. NO uses GPGs OT-TECH ni IT.
-→ Si el usuario responde '2' o 'tech' o 'ot' → usar ÚNICAMENTE G-301293, G-301294, G-301295, G-301296, G-301297, G-301298.
 
 CASO 2 — ALQUILER (después de saber quién ejecuta):
 Si es alquiler/renta y NO especifica duración:
@@ -414,7 +394,6 @@ ${T[lang].langLine}\n`;
     p += `\n=== CATÁLOGO DE GPGs ===\n`;
     let n=0;
     for (const [pn,g] of gpgMap.entries()) {
-      if (excludeIT && g.isIT) continue; // Skip IT GPGs for physical work
       const gpgTag = g.isCapex?"[CAPEX]":"";
       p += `${pn}${gpgTag?" "+gpgTag:""} | ${g.desc} | ${g.accGroup} | ${g.accountDef||"N/D"}\n`;
     }
@@ -608,12 +587,7 @@ export default function App() {
     const ctrl = new AbortController(); abortRef.current = ctrl;
     try {
       // Detect executor from conversation history to filter catalog
-      const allText = [...newMsgs].map(m => m.content.toLowerCase()).join(" ");
-      const isMaintenance = /mantenimiento|maintenance/.test(allText);
-      const isTech = /tech|ot|ota|tecnolog/.test(allText) && !isMaintenance;
-      // Filter: if maintenance → exclude IT; if tech → exclude AM (handled in prompt)
-      const excludeIT = isMaintenance || /manlift|grua|rtg|sts|mhc|andamio|pintura|civil|soldadura|neumatico|luminaria/.test(allText);
-      const system  = buildSystem(currGpg, currCoa, lang, null, excludeIT) + buildPoContext(similar, gpgMap);
+      const system  = buildSystem(currGpg, currCoa, lang) + buildPoContext(similar, gpgMap);
       const apiMsgs = newMsgs.map(m=>({ role:m.role, content:m.content }));
 
       const res = await fetch("/api/chat", {
